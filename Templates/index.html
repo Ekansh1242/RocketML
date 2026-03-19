@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROCKETML — Performance Prediction</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #060810;
+    --surface:   #0d1117;
+    --card:      #111827;
+    --border:    #1f2d3d;
+    --accent:    #f97316;
+    --accent2:   #3b82f6;
+    --accent3:   #10b981;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --danger:    #ef4444;
+    --glow:      rgba(249,115,22,0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid background ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(249,115,22,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(249,115,22,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    position: relative;
+    padding: 24px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(249,115,22,0.05) 0%, transparent 100%);
+    z-index: 10;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    position: relative;
+  }
+
+  .logo-icon svg { width: 40px; height: 40px; }
+
+  .logo-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(249,115,22,0.5);
+  }
+
+  .logo-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    margin-top: 2px;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent3);
+    box-shadow: 0 0 6px var(--accent3);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .model-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .model-btn {
+    padding: 6px 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+
+  .model-btn.active {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+
+  /* ── Main layout ── */
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px;
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ── Section labels ── */
+  .section-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  /* ── Inputs ── */
+  .input-grid {
+    display: grid;
+    gap: 14px;
+  }
+
+  .input-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .input-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+
+  .input-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .input-unit {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent2);
+    letter-spacing: 1px;
+  }
+
+  .input-range {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .slider-wrapper {
+    position: relative;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    height: 3px;
+    -webkit-appearance: none;
+    background: var(--border);
+    border-radius: 0;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border-radius: 0;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(249,115,22,0.6);
+    transform: rotate(45deg);
+  }
+
+  input[type="range"]::-webkit-slider-runnable-track {
+    background: linear-gradient(90deg, var(--accent) var(--pct, 0%), var(--border) var(--pct, 0%));
+    height: 3px;
+  }
+
+  .value-display {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    text-align: right;
+    min-width: 70px;
+    background: rgba(249,115,22,0.08);
+    border: 1px solid rgba(249,115,22,0.2);
+    padding: 6px 10px;
+    border-radius: 2px;
+  }
+
+  /* ── Predict button ── */
+  .predict-btn {
+    width: 100%;
+    padding: 16px;
+    margin-top: 24px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 2px;
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+
+  .predict-btn:hover {
+    background: #ea6c0a;
+    box-shadow: 0 0 30px rgba(249,115,22,0.4);
+    transform: translateY(-1px);
+  }
+
+  .predict-btn:active { transform: translateY(0); }
+
+  .predict-btn.loading {
+    pointer-events: none;
+  }
+
+  .predict-btn.loading::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: -100%;
+    width: 100%; height: 2px;
+    background: rgba(0,0,0,0.3);
+    animation: loadbar 1s infinite;
+  }
+
+  @keyframes loadbar {
+    to { left: 100%; }
+  }
+
+  /* ── Right panel ── */
+  .right-panel {
+    display: grid;
+    gap: 24px;
+  }
+
+  /* ── Output cards ── */
+  .output-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .metric-card.highlight {
+    border-color: rgba(249,115,22,0.4);
+    background: linear-gradient(135deg, rgba(249,115,22,0.05), var(--card));
+  }
+
+  .metric-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 60px; height: 60px;
+    border-top: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+    opacity: 0.3;
+  }
+
+  .metric-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .metric-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--accent);
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(249,115,22,0.3);
+    transition: all 0.5s;
+  }
+
+  .metric-value.blue { color: var(--accent2); text-shadow: 0 0 20px rgba(59,130,246,0.3); }
+  .metric-value.green { color: var(--accent3); text-shadow: 0 0 20px rgba(16,185,129,0.3); }
+
+  .metric-unit {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 2px;
+  }
+
+  /* ── Combustion panel ── */
+  .combustion-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .cea-cell {
+    background: rgba(59,130,246,0.05);
+    border: 1px solid rgba(59,130,246,0.15);
+    border-radius: 4px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .cea-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent2);
+    margin-bottom: 8px;
+  }
+
+  .cea-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    transition: all 0.5s;
+  }
+
+  .cea-unit {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Gauge ── */
+  .gauge-row {
+    display: grid;
+    grid-template-columns: 120px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .gauge-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .gauge-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  .gauge-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    width: 0%;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .gauge-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: var(--text);
+    min-width: 60px;
+    text-align: right;
+  }
+
+  /* ── Optimize section ── */
+  .optimize-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .optimize-btn {
+    padding: 12px 28px;
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .optimize-btn:hover {
+    background: rgba(59,130,246,0.1);
+    box-shadow: 0 0 20px rgba(59,130,246,0.2);
+  }
+
+  .trials-input {
+    width: 80px;
+    padding: 11px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    border-radius: 2px;
+    outline: none;
+    text-align: center;
+  }
+
+  .trials-input:focus { border-color: var(--accent2); }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 30px; right: 30px;
+    padding: 14px 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent3);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--text);
+    border-radius: 2px;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 100;
+    max-width: 320px;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { border-left-color: var(--danger); }
+
+  /* ── Placeholder state ── */
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--muted);
+    text-align: center;
+    gap: 12px;
+  }
+
+  .placeholder svg { opacity: 0.2; }
+
+  .placeholder p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+  }
+
+  /* ── Number counter animation ── */
+  @keyframes countup {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-in {
+    animation: countup 0.4s ease forwards;
+  }
+
+  /* ── Scanline effect ── */
+  .scanline {
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ── corner decoration ── */
+  .corner-tl, .corner-br {
+    position: absolute;
+    width: 12px; height: 12px;
+  }
+  .corner-tl { top: 8px; left: 8px; border-top: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+  .corner-br { bottom: 8px; right: 8px; border-bottom: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    margin-bottom: -1px;
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr; }
+    .combustion-grid { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 4L24 16H32L26 24L28 36L20 30L12 36L14 24L8 16H16L20 4Z" fill="none" stroke="#f97316" stroke-width="1.5"/>
+        <path d="M20 10L22 18H28L23 22L25 30L20 26L15 30L17 22L12 18H18L20 10Z" fill="rgba(249,115,22,0.15)"/>
+        <circle cx="20" cy="20" r="3" fill="#f97316"/>
+        <line x1="20" y1="30" x2="17" y2="38" stroke="#f97316" stroke-width="1" opacity="0.5"/>
+        <line x1="20" y1="30" x2="23" y2="38" stroke="#f97316" stroke-width="1" opacity="0.5"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">ROCKETML</div>
+      <div class="logo-sub">PERFORMANCE PREDICTION ENGINE v2.0</div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span>SYSTEM ONLINE</span>
+    </div>
+    <div class="model-toggle">
+      <button class="model-btn active" id="btn-xgb">XGB</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ── LEFT: Input panel ── -->
+  <div>
+    <div class="section-label">// INPUT PARAMETERS</div>
+    <div class="card">
+      <div class="corner-tl"></div>
+      <div class="corner-br"></div>
+
+      <div class="input-grid" id="sliders"></div>
+
+      <button class="predict-btn" id="predict-btn" onclick="predict()">
+        ▶ LAUNCH PREDICTION
+      </button>
+
+      <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+        <div class="tab-bar">
+          <div class="tab active" onclick="switchTab('predict-tab', this)">PREDICT</div>
+          <div class="tab" onclick="switchTab('optimize-tab', this)">OPTIMIZE</div>
+        </div>
+        <div class="tab-content active" id="predict-tab">
+          <p style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;line-height:1.8">
+            Adjust sliders → click LAUNCH PREDICTION<br>
+            The model returns apogee + max velocity<br>
+            using your 8 design parameters.
+          </p>
+        </div>
+        <div class="tab-content" id="optimize-tab">
+          <div class="optimize-row">
+            <button class="optimize-btn" onclick="optimize()">⚡ RUN OPTUNA</button>
+            <input class="trials-input" id="n-trials" type="number" value="60" min="10" max="300">
+            <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)">TRIALS</span>
+          </div>
+          <p style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:12px;line-height:1.8">
+            Bayesian search for optimal design.<br>
+            Results will populate sliders + outputs.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Output panel ── -->
+  <div class="right-panel">
+
+    <!-- Main outputs -->
+    <div>
+      <div class="section-label">// FLIGHT PREDICTIONS</div>
+      <div class="output-grid">
+        <div class="metric-card highlight" id="card-apogee">
+          <div class="metric-label">APOGEE ALTITUDE</div>
+          <div class="metric-value" id="val-apogee">—</div>
+          <div class="metric-unit">METRES AGL</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">MAX VELOCITY</div>
+          <div class="metric-value blue" id="val-velocity">—</div>
+          <div class="metric-unit">METRES / SEC</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Combustion outputs -->
+    <div>
+      <div class="section-label">// COMBUSTION PARAMETERS (RocketCEA)</div>
+      <div class="card">
+        <div class="combustion-grid">
+          <div class="cea-cell">
+            <div class="cea-label">ISP_VAC</div>
+            <div class="cea-value" id="cea-isp">—</div>
+            <div class="cea-unit">SECONDS</div>
+          </div>
+          <div class="cea-cell">
+            <div class="cea-label">C* (C-STAR)</div>
+            <div class="cea-value" id="cea-cstar">—</div>
+            <div class="cea-unit">M / SEC</div>
+          </div>
+          <div class="cea-cell">
+            <div class="cea-label">CF (THRUST COEFF)</div>
+            <div class="cea-value" id="cea-cf">—</div>
+            <div class="cea-unit">DIMENSIONLESS</div>
+          </div>
+          <div class="cea-cell">
+            <div class="cea-label">CHAMBER PRESSURE</div>
+            <div class="cea-value" id="cea-pc">—</div>
+            <div class="cea-unit">BAR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design parameter gauges -->
+    <div>
+      <div class="section-label">// DESIGN PARAMETER OVERVIEW</div>
+      <div class="card" id="gauge-panel">
+        <div class="placeholder">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="20" stroke="#64748b" stroke-width="1"/>
+            <path d="M24 14v10l6 6" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <p>RUN A PREDICTION TO SEE<br>PARAMETER OVERVIEW</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Slider config ──
+const PARAMS = [
+  { key:'thrust',          label:'THRUST',          unit:'N',   min:800,  max:2000, step:10,  default:1500 },
+  { key:'burn_time',       label:'BURN TIME',       unit:'s',   min:3,    max:8,    step:0.1, default:5 },
+  { key:'mass',            label:'TOTAL MASS',      unit:'kg',  min:40,   max:100,  step:1,   default:70 },
+  { key:'drag',            label:'DRAG COEFF',      unit:'Cd',  min:0.2,  max:0.6,  step:0.01,default:0.4 },
+  { key:'angle',           label:'LAUNCH ANGLE',    unit:'°',   min:75,   max:90,   step:0.5, default:85 },
+  { key:'diameter',        label:'DIAMETER',        unit:'m',   min:0.1,  max:0.3,  step:0.01,default:0.2 },
+  { key:'propellant_mass', label:'PROPELLANT MASS', unit:'kg',  min:10,   max:40,   step:0.5, default:25 },
+  { key:'wind',            label:'WIND SPEED',      unit:'m/s', min:0,    max:10,   step:0.1, default:3 },
+];
+
+let activeModel = 'xgb';
+
+// Build sliders
+const container = document.getElementById('sliders');
+PARAMS.forEach(p => {
+  const pct = ((p.default - p.min) / (p.max - p.min) * 100).toFixed(1);
+  container.innerHTML += `
+    <div>
+      <div class="input-meta">
+        <span class="input-label">${p.label}</span>
+        <span class="input-unit">${p.unit}</span>
+      </div>
+      <div class="input-row">
+        <div class="slider-wrapper">
+          <div class="input-range">${p.min} – ${p.max}</div>
+          <input type="range" id="s-${p.key}" min="${p.min}" max="${p.max}"
+                 step="${p.step}" value="${p.default}"
+                 style="--pct:${pct}%"
+                 oninput="updateSlider('${p.key}', this)">
+        </div>
+        <div class="value-display" id="v-${p.key}">${p.default}</div>
+      </div>
+    </div>`;
+});
+
+function updateSlider(key, el) {
+  const p = PARAMS.find(x => x.key === key);
+  const pct = ((el.value - p.min) / (p.max - p.min) * 100).toFixed(1);
+  el.style.setProperty('--pct', pct + '%');
+  document.getElementById('v-' + key).textContent = parseFloat(el.value).toFixed(
+    el.step < 1 ? (el.step < 0.1 ? 3 : 2) : 0
+  );
+}
+
+function getValues() {
+  const out = {};
+  PARAMS.forEach(p => {
+    out[p.key] = parseFloat(document.getElementById('s-' + p.key).value);
+  });
+  return out;
+}
+
+function setValues(obj) {
+  PARAMS.forEach(p => {
+    if (obj[p.key] !== undefined) {
+      const el = document.getElementById('s-' + p.key);
+      el.value = obj[p.key];
+      updateSlider(p.key, el);
+    }
+  });
+}
+
+// ── Prediction ──
+async function predict() {
+  const btn = document.getElementById('predict-btn');
+  btn.textContent = '⟳ COMPUTING...';
+  btn.classList.add('loading');
+
+  try {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(getValues())
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderOutput(data);
+    showToast('PREDICTION COMPLETE', false);
+  } catch(e) {
+    showToast('ERROR: ' + e.message, true);
+  } finally {
+    btn.textContent = '▶ LAUNCH PREDICTION';
+    btn.classList.remove('loading');
+  }
+}
+
+function renderOutput(data) {
+  const p = data.predictions;
+  const c = data.combustion;
+  const design = data.design;
+
+  animateValue('val-apogee', p.apogee_m);
+  animateValue('val-velocity', p.max_velocity_ms);
+
+  if (c) {
+    animateValue('cea-isp',   c.isp_vac,            1);
+    animateValue('cea-cstar', c.c_star,              1);
+    animateValue('cea-cf',    c.cf,                  3);
+    animateValue('cea-pc',    c.chamber_pressure_bar,1);
+  }
+
+  renderGauges(design);
+}
+
+function animateValue(id, target, decimals=2) {
+  const el = document.getElementById(id);
+  const start = parseFloat(el.textContent) || 0;
+  const duration = 600;
+  const startTime = performance.now();
+
+  function step(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    const val = start + (target - start) * ease;
+    el.textContent = val.toFixed(decimals);
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = target.toFixed(decimals);
+  }
+  requestAnimationFrame(step);
+  el.classList.add('animate-in');
+  setTimeout(() => el.classList.remove('animate-in'), 400);
+}
+
+function renderGauges(design) {
+  const panel = document.getElementById('gauge-panel');
+  panel.innerHTML = '';
+  PARAMS.forEach(p => {
+    const val = design[p.key];
+    const pct = ((val - p.min) / (p.max - p.min) * 100).toFixed(1);
+    panel.innerHTML += `
+      <div class="gauge-row">
+        <div class="gauge-label">${p.label}</div>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:0%" data-pct="${pct}"></div></div>
+        <div class="gauge-val">${parseFloat(val).toFixed(p.step < 1 ? 2 : 0)} <span style="font-size:9px;color:var(--muted)">${p.unit}</span></div>
+      </div>`;
+  });
+  // Animate bars after render
+  setTimeout(() => {
+    panel.querySelectorAll('.gauge-fill').forEach(el => {
+      el.style.width = el.dataset.pct + '%';
+    });
+  }, 50);
+}
+
+// ── Optimize ──
+async function optimize() {
+  const n = parseInt(document.getElementById('n-trials').value) || 60;
+  showToast('RUNNING OPTUNA — ' + n + ' TRIALS...', false);
+
+  try {
+    const res = await fetch('/optimize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ n_trials: n })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    setValues(data.best_design);
+    renderOutput({ predictions: data.predictions, combustion: data.combustion, design: data.best_design });
+    showToast('OPTIMAL DESIGN FOUND ✓', false);
+  } catch(e) {
+    showToast('ERROR: ' + e.message, true);
+  }
+}
+
+// NN model not available
+
+// ── Tab switch ──
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── Toast ──
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
