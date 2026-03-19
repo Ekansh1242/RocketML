@@ -8,5 +8,5 @@ optuna>=4.0.0
 xgboost>=2.0.0
 torch>=2.2.0
 rocketpy>=1.11.0
-rocketcea>=1.1.4
+
 gunicorn>=22.0.0
